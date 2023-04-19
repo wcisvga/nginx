@@ -2,9 +2,6 @@
 # 请在本文件同级目录新建立一个 files文件夹，并在里面放网站证书文件对，公钥名为 web.pem , 私钥名为 web.key
 - hosts: all
   remote_user: root
-  become: yes
-  vars:
-    website: 'localhost' #这里写你的域名
   tasks:
   - name: 安装nginx依赖
     yum:
@@ -31,6 +28,7 @@
     args:
       chdir: /usr/src/nginx-1.22.1
 
+  # 这里用来配置nginx，这只是一个示例。可以添加自定义内容
   - name: 配置nginx.conf 文件 
     blockinfile:
       path: /opt/nginx/conf/nginx.conf
@@ -43,7 +41,7 @@
 
           server {
               listen 80;
-              server_name {{website}};
+              server_name {{inventory_hostname}};
               location / {
                   root html;
                   index index.html index.htm;
@@ -51,7 +49,7 @@
           }
           server {
               listen 443 ssl;
-              server_name {{website}};
+              server_name {{inventory_hostname}};
               ssl_certificate /opt/nginx/ssl/web.pem;
               ssl_certificate_key /opt/nginx/ssl/web.key;
 
