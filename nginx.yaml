@@ -1,6 +1,111 @@
+---
+# 请在本文件同级目录新建立一个 files文件夹，并在里面放网站证书文件对，公钥名为 web.pem , 私钥名为 web.key
 - hosts: all
   remote_user: root
+  become: yes
+  vars:
+    website: 'localhost' #这里写你的域名
   tasks:
-  - name: 安装 nginx依赖
+  - name: 安装nginx依赖
     yum:
-      
+      name: '{{item}}'
+    loop:
+    - openssl-devel
+    - zlib-devel
+    - pcre-devel
+    - make
+    - gcc
+
+  - name: 上传nginx源码
+    unarchive:
+      src: https://nginx.org/download/nginx-1.22.1.tar.gz
+      dest: /usr/src
+      remote_src: true
+
+  - name: 编译安装nginx
+    shell: |
+      ./configure --prefix=/opt/nginx --with-http_ssl_module
+      make
+      make install
+      sed -i -e '/http/,$d' /opt/nginx/conf/nginx.conf
+    args:
+      chdir: /usr/src/nginx-1.22.1
+
+  - name: 配置nginx.conf 文件 
+    blockinfile:
+      path: /opt/nginx/conf/nginx.conf
+      block: |
+        http {
+          include mime.types;
+          default_type application/octet-stream;
+          sendfile on;
+          keepalive_timeout 60;
+
+          server {
+              listen 80;
+              server_name {{website}};
+              location / {
+                  root html;
+                  index index.html index.htm;
+              }
+          }
+          server {
+              listen 443 ssl;
+              server_name {{website}};
+              ssl_certificate /opt/nginx/ssl/web.pem;
+              ssl_certificate_key /opt/nginx/ssl/web.key;
+
+              location / {
+                  root html;
+                  index index.html index.htm;
+              }
+          }
+        }
+
+  - name: 生成nginx.service文件 
+    blockinfile:
+      path: /usr/lib/systemd/system/nginx.service
+      block: |
+        [Unit]
+        Description=nginx.service
+        [Service]
+        ExecStart=/opt/nginx/sbin/nginx -c /opt/nginx/conf/nginx.conf
+        ExecReload=/opt/nginx/sbin/nginx -s reload
+        ExecStop=/opt/nginx/sbin/nginx -s stop
+        Type=forking
+        Restart=on-failure
+        RestartSec=15
+        Delegate=yes
+        PrivateTmp=yes
+        [Install]
+        WantedBy=multi-user.target
+      create: yes
+    notify: restart nginx
+
+  - name: 建立ssl目录
+    file:
+      name: /opt/nginx/ssl
+      state: directory
+      recurse: yes
+
+  - name: 上传证书文件 
+    copy:
+      src: '{{item}}'
+      dest: /opt/nginx/ssl
+    loop:
+    - web.pem
+    - web.key
+    notify: restart nginx
+
+  - name: 启动nginx服务
+    systemd:
+      name: nginx
+      state: started
+      enabled: yes
+
+  handlers:
+  - name: restart nginx
+    systemd:
+      name: nginx
+      state: restarted
+      daemon-reload: yes
