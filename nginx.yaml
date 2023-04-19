@@ -1,1 +1,6 @@
 - hosts: all
+  remote_user: root
+  tasks:
+  - name: 安装 nginx依赖
+    yum:
+      
