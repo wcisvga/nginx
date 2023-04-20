@@ -8,8 +8,8 @@
     然后运行如下：
 
 
-    `
+```shell
         ansible-playbook nginx.yaml
-    `
+```
 
 ### 再说点废话，如果主机是在云上，请配置安全组，本地主机请先配置防火墙和selinux
